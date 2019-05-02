@@ -1,41 +1,53 @@
 from PIL import Image
-from math import sqrt
 from pathlib import Path
-import time
+import argparse
 
 
-def load_colour_palette(fp: str, width: int, height: int) -> list:
-    # width and hight is the dimentions of each color in the palette
-    img = Image.open(fp)
-    colours = []
-    for x in range(0, img.width, width):
-        for y in range(0, img.height, height):
-            colours.append(img.getpixel((x, y)))
-    return colours
+def swap_palette(img: Image, colors: int) -> Image:
+    return img.convert("P", colors=colors)
 
 
-PALETTE = load_colour_palette("colour_palette_1px.png", 1, 1)
-
-
-def bitify_color(img: Image, f_extention: str) -> None:
+def bitify(path: str, color_bit: int = None,
+           resolution: int = None, new_name: str = None) -> None:
+    extention = Path(path).suffix
+    img = Image.open(path)
     exif = img.info["exif"] if "exif" in img.info else None
-    t = time.perf_counter()
-    for x in range(img.width):
-        for y in range(img.height):
-            distances = []
-            r1, g1, b1, *_ = img.getpixel((x, y))
-            for r2, g2, b2, *__ in PALETTE:
-                distance = sqrt((r2-r1)**2 + (g2-g1)**2 + (b2-b1)**2)
-                distances.append(distance)
-            average = PALETTE[distances.index(min(distances))]
-            img.putpixel((x, y), average)
-        print(f"completed line {x} / {img.width}")
-    print(time.perf_counter() - t)
-    img.save(f"out{f_extention}", exif=exif)
+    og_width, og_height = img.size
+
+    if resolution:
+        aspect_ratio = og_height / og_width
+        height = int(aspect_ratio * resolution)
+        img = img.resize((resolution, height))
+        if color_bit:
+            img = swap_palette(img, 2**color_bit)
+        img = img.resize((og_width, og_height))
+    elif color_bit:
+        img = swap_palette(img, 2**color_bit)
+
+    if new_name:
+        if extention:
+            img.save(Path(new_name).absolute(), exif=exif)
+        else:
+            img.save(Path(f"{new_name}.png").absolute(), exif=exif)
+    else:
+        if extention:
+            img.save(Path(f"{Path(path).stem}_modified{extention}"))
+        else:
+            img.save(Path(f"{Path(path).stem}_modified{Path(path).suffix}"))
 
 
 if __name__ == '__main__':
-    path = "me.png"
-    extention = Path(path).suffix
-    image = Image.open(path)
-    bitify_color(image, extention)
+    parser = argparse.ArgumentParser(description='"8-bitify" an image.')
+    parser.add_argument("file", type=str,
+                        help="The file to process.")
+    parser.add_argument("-c", "--color_bit", type=int,
+                        help="The size of the color palette.")
+    parser.add_argument("-r", "--resolution", type=int,
+                        help="The downscaled resolution example 1080.")
+    parser.add_argument("-n", "--new_name", type=str,
+                        help="The new file name.")
+    args = parser.parse_args()
+
+    bitify(args.file, color_bit=args.color_bit,
+           resolution=args.resolution, new_name=args.new_name)
+
