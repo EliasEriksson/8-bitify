@@ -4,7 +4,11 @@ import argparse
 
 
 def swap_palette(img: Image, colors: int) -> Image:
-    return img.convert("P", colors=colors)
+    return img.convert("P", colors=colors, palette=Image.ADAPTIVE).convert("RGB")
+
+
+def resize(img: Image, width: int, height: int) -> Image:
+    return img.resize((width, height), resample=Image.NEAREST)
 
 
 def bitify(path: str, color_bit: int = None,
@@ -17,11 +21,9 @@ def bitify(path: str, color_bit: int = None,
     if resolution:
         aspect_ratio = og_height / og_width
         height = int(aspect_ratio * resolution)
-        img = img.resize((resolution, height))
-        if color_bit:
-            img = swap_palette(img, 2**color_bit)
-        img = img.resize((og_width, og_height))
-    elif color_bit:
+        img = resize(img, resolution, height)
+        img = resize(img, og_width, og_height)
+    if color_bit:
         img = swap_palette(img, 2**color_bit)
 
     if new_name:
@@ -31,9 +33,9 @@ def bitify(path: str, color_bit: int = None,
             img.save(Path(f"{new_name}.png").absolute(), exif=exif)
     else:
         if extention:
-            img.save(Path(f"{Path(path).stem}_modified{extention}"))
+            img.save(Path(f"{Path(path).stem}_modified{extention}"), exif=exif)
         else:
-            img.save(Path(f"{Path(path).stem}_modified{Path(path).suffix}"))
+            img.save(Path(f"{Path(path).stem}_modified{Path(path).suffix}"), exif=exif)
 
 
 if __name__ == '__main__':
